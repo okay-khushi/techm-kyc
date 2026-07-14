@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+*.pyo
+
+.venv/
+venv/
+env/
+
+.env
+
+.cache/
+
+# Reference datasets are large (>1GB total) and don't belong in git;
+# source them separately (shared drive / download script).
+knowledge/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+*.egg-info/
+dist/
+build/
+
+.vscode/
+.idea/
+
+*.log
