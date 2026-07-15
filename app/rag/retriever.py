@@ -57,7 +57,7 @@ class Retriever:
         if len(store) == 0:
             return []
 
-        query_vector = embedding_service.embed([query])[0]
+        query_vector = embedding_service.embed([query], is_query=True)[0]
         results = store.search(query_vector, top_k=top_k)
 
         return [

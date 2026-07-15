@@ -162,6 +162,24 @@ class EvidenceLookupTool:
 
         return hits[:limit]
 
+    def list_clients(self, limit: int = 500) -> List[Dict[str, Any]]:
+        """
+        Distinct client_id/client_name pairs from the KYC reference
+        data, for UI pickers (e.g. the dashboard's client dropdown)
+        rather than free-typed client ids.
+        """
+
+        clients = _datasets.clients_with_fatf_ofac()
+
+        if clients.empty or "client_id" not in clients.columns:
+            return []
+
+        columns = [c for c in ("client_id", "client_name", "country", "sector") if c in clients.columns]
+
+        deduped = clients[columns].drop_duplicates(subset="client_id").sort_values("client_id")
+
+        return deduped.head(limit).to_dict(orient="records")
+
     def search_transactions(
         self,
         client_id: Optional[str] = None,

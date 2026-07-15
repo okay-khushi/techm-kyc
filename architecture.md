@@ -8,7 +8,9 @@ grounded Suspicious Activity Report (SAR) via a FastAPI service.
 
 ```mermaid
 flowchart LR
-    Client([Client]) -->|"POST /api/v1/analyze*"| API[FastAPI\napp/api]
+    Browser([Browser]) -->|"GET /dashboard/"| Dashboard[Dashboard\napp/static/dashboard]
+    Dashboard -->|fetch| API
+    Client([Client / curl]) -->|"POST /api/v1/analyze*"| API[FastAPI\napp/api]
     API --> Guardrail[Guardrails\napp/guardrails]
     API --> Graph[LangGraph pipeline\napp/orchestrator]
     Graph <--> Agents[Agents\napp/agents]
@@ -49,6 +51,10 @@ app/
   prompts/        One markdown prompt per LLM-backed agent.
   rag/            Retrieval stack: chunker, embeddings, reranker,
                   retriever, vectorstore (FAISS, numpy fallback).
+                  Embeddings prefer NVIDIA NIM (`NVIDIA_API_KEY`) when
+                  configured, else local sentence-transformers, else a
+                  dependency-free hashing embedder — decided once at
+                  startup (see Notable constraints).
   schemas/        API-facing schemas distinct from internal models
                   (graph_state, finding, report, evidence, api).
   services/       Business logic layer between agents/tools and
@@ -69,7 +75,14 @@ app/
   workflows/      Alternate, narrower graphs for cheaper/faster calls:
                   investigation-only, contract_review, privacy_review,
                   full_analysis.
-  main.py         FastAPI app entrypoint, exception handlers.
+  main.py         FastAPI app entrypoint, exception handlers, mounts
+                  the dashboard.
+  static/dashboard/  Self-contained HTML/CSS/JS dashboard (no build
+                  step, no new deps) served at /dashboard/. Submits a
+                  contract/SOW to /api/v1/analyze*, then renders the
+                  pipeline stepper, findings, evidence, citations and
+                  the generated SAR report (with a text download),
+                  plus run history and metrics panels.
 
 knowledge/        Static reference data the tools query:
                   aml/SAML-D.csv (~1GB, 9.5M rows), sanctions/ (OFAC SDN,
@@ -123,12 +136,37 @@ flowchart TD
 - **citation / orchestrator** — citation trail, final executive
   verdict, output-stage guardrails.
 
+## Dashboard (`app/static/dashboard/index.html`)
+
+Served at `GET /dashboard/` (mounted via `StaticFiles` in `app/main.py`).
+A single self-contained page — no framework, no build step:
+
+- **Input panel** — contract/SOW text, a client dropdown (populated
+  from `GET /clients`, backed by the KYC data, sets `metadata.client_id`),
+  a `contains_pii` checkbox, an advanced raw-metadata JSON field, and a
+  pipeline selector matching the four `/analyze*` endpoints.
+- **Results panel** — risk-score gauge, confidence, verified badge,
+  request id; a pipeline stepper showing each of the 13 nodes as
+  done / flagged / skipped (privacy) / pending from `execution_log`;
+  tabs for overview, findings, evidence & citations, and the SAR report.
+- **SAR tab** — verification badge, LLM summary, recommendations, and
+  a **Download SAR** button that renders the report as a plain-text
+  file client-side.
+- **Side panel** — run history (`GET /history`, `GET /history/{id}`)
+  and live metrics (`GET /metrics`).
+
+It talks only to this app's own `/api/v1` endpoints (same-origin
+`fetch`), and includes an optional API-key field for when `API_KEY` is
+set in `.env`.
+
 ## API (`app/api/routes.py`), all under `/api/v1`
 
 - `POST /analyze` — full pipeline.
 - `POST /analyze/investigation` — investigation + evidence only.
 - `POST /analyze/contract-review` — investigation + compliance + privacy.
 - `POST /analyze/privacy-review` — investigation + privacy only.
+- `GET /clients` — distinct client_id/client_name/country/sector from
+  the KYC reference data, for the dashboard's client picker.
 - `GET /history` / `GET /history/{request_id}` — past executions.
 - `GET /graph` — mermaid diagram of the full pipeline.
 - `GET /metrics` — in-process timing/counters.
@@ -148,3 +186,13 @@ Set `API_KEY` in `.env` to require an `X-API-Key` header.
   `GROQ_API_KEY` or `GOOGLE_API_KEY` (see `.env.example`) for live
   LLM-backed agents to run; without one, only monkeypatched/mocked
   runs work.
+- `app/rag/embeddings.py:EmbeddingService` picks its embedder once at
+  first use and never switches mid-process — mixing embedding spaces
+  in one vector store would make search meaningless. If `NVIDIA_API_KEY`
+  is set, it probes NVIDIA NIM once; on failure it falls back to
+  sentence-transformers, then hashing. Because NIM's embedding
+  dimension (1024 for `nv-embedqa-e5-v5`) differs from the local model's
+  (384), `VectorStore.load()` discards any cached `.cache/vectorstore/*`
+  file whose dimension doesn't match the active embedder and rebuilds
+  it from source — expect one slow, network-using rebuild per corpus
+  the first time each is searched after switching providers.

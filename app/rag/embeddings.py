@@ -1,12 +1,17 @@
 import hashlib
 from typing import List
 
+import httpx
 import numpy as np
 
+from app.config.settings import settings
 from app.telemetry.logger import get_logger
 from app.utils.constants import EMBEDDING_DIM_FALLBACK, EMBEDDING_MODEL_NAME
 
 logger = get_logger()
+
+NVIDIA_EMBEDDINGS_URL = "https://integrate.api.nvidia.com/v1/embeddings"
+NVIDIA_MAX_BATCH_SIZE = 512  # NIM's e5-v5 batcher rejects requests over 1024 inputs
 
 
 class HashingEmbedder:
@@ -37,20 +42,87 @@ class HashingEmbedder:
         return vectors
 
 
+class NimEmbedder:
+    """
+    Calls NVIDIA NIM's hosted embeddings API instead of running a model
+    locally. Chosen once at startup (see `EmbeddingService._load_model`)
+    when `NVIDIA_API_KEY` is configured; never mixed at runtime with the
+    local model/hashing fallback, since switching embedders mid-corpus
+    would put vectors from different spaces in the same index.
+    """
+
+    def __init__(self, api_key: str, model: str):
+        self._client = httpx.Client(
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+            timeout=30.0,
+        )
+        self._model = model
+
+    def encode(self, texts: List[str], input_type: str = "passage") -> np.ndarray:
+        batches = [
+            texts[i:i + NVIDIA_MAX_BATCH_SIZE]
+            for i in range(0, len(texts), NVIDIA_MAX_BATCH_SIZE)
+        ] or [[]]
+
+        vectors = np.vstack([self._encode_batch(batch, input_type) for batch in batches])
+
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+
+        return vectors / norms
+
+    def _encode_batch(self, texts: List[str], input_type: str) -> np.ndarray:
+        response = self._client.post(
+            NVIDIA_EMBEDDINGS_URL,
+            json={
+                "input": texts,
+                "model": self._model,
+                "input_type": input_type,
+                "encoding_format": "float",
+                "truncate": "NONE",
+            },
+        )
+        response.raise_for_status()
+
+        data = sorted(response.json()["data"], key=lambda item: item["index"])
+
+        return np.array([item["embedding"] for item in data], dtype="float32")
+
+
 class EmbeddingService:
     """
-    Lazily loads a sentence-transformers model for embeddings, falling
-    back to a hashing-based embedder if the model is unavailable.
+    Lazily picks an embedder, in order of preference: NVIDIA NIM (if
+    `NVIDIA_API_KEY` is set and reachable), then a local
+    sentence-transformers model, then a dependency-free hashing
+    embedder. The choice is made once and kept for the process
+    lifetime — see `NimEmbedder` docstring for why.
     """
 
     def __init__(self):
         self._model = None
+        self._nim = None
         self._fallback = None
         self._dim = None
 
     def _load_model(self):
-        if self._model is not None or self._fallback is not None:
+        if self._model is not None or self._nim is not None or self._fallback is not None:
             return
+
+        if settings.NVIDIA_API_KEY:
+            try:
+                nim = NimEmbedder(settings.NVIDIA_API_KEY, settings.NVIDIA_EMBEDDING_MODEL)
+                probe = nim.encode(["healthcheck"], input_type="query")
+
+                self._nim = nim
+                self._dim = probe.shape[1]
+
+                return
+
+            except Exception as exc:
+                logger.warning(
+                    "Falling back from NVIDIA NIM embeddings "
+                    f"('{settings.NVIDIA_EMBEDDING_MODEL}'): {exc}"
+                )
 
         try:
             from sentence_transformers import SentenceTransformer
@@ -77,11 +149,14 @@ class EmbeddingService:
 
         return self._dim
 
-    def embed(self, texts: List[str]) -> np.ndarray:
+    def embed(self, texts: List[str], is_query: bool = False) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dimension), dtype="float32")
 
         self._load_model()
+
+        if self._nim is not None:
+            return self._nim.encode(texts, input_type="query" if is_query else "passage")
 
         if self._model is not None:
             vectors = self._model.encode(

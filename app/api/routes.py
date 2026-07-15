@@ -9,6 +9,7 @@ from app.orchestrator.workflow import graph as full_analysis_graph
 from app.schemas.api import AnalyzeRequest
 from app.telemetry.execution_history import execution_history
 from app.telemetry.metrics import metrics
+from app.tools.evidence_lookup import evidence_lookup_tool
 from app.utils.formatter import to_jsonable
 from app.workflows.contract_review import contract_review_graph
 from app.workflows.investigation import investigation_graph
@@ -81,6 +82,17 @@ async def analyze_privacy_review(request: AnalyzeRequest):
     """
 
     return await _run(privacy_review_graph, request)
+
+
+@router.get("/clients")
+async def list_clients():
+    """
+    Known clients from the KYC reference data, for UI pickers (e.g.
+    the dashboard's client dropdown) to select a client_id by name
+    instead of typing one in blind.
+    """
+
+    return {"clients": to_jsonable(evidence_lookup_tool.list_clients())}
 
 
 @router.get("/history")

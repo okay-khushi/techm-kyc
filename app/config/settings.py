@@ -11,6 +11,10 @@ class Settings(BaseSettings):
 
     GROQ_API_KEY: str = ""
 
+    NVIDIA_API_KEY: str = ""
+
+    NVIDIA_EMBEDDING_MODEL: str = "nvidia/nv-embedqa-e5-v5"
+
     LLM_PROVIDER: str = "groq"
 
     DEFAULT_MODEL: str = "llama-3.3-70b-versatile"

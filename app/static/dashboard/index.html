@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Engine — Compliance Dashboard</title>
+<style>
+  /*
+    Light, professional palette by default regardless of OS theme —
+    the toggle button still allows switching to --data-theme="dark".
+  */
+  :root {
+    color-scheme: light;
+    --bg: #f4f6f9;
+    --panel: #ffffff;
+    --panel-alt: #f8f9fc;
+    --border: #e4e8f0;
+    --text: #16192b;
+    --muted: #66708a;
+    --accent: #2f4bd6;
+    --accent-hover: #23399f;
+    --accent-weak: #eaeefe;
+    --good: #157347;
+    --good-weak: #e5f5ee;
+    --warn: #a9660b;
+    --warn-weak: #fbf0dd;
+    --bad: #b3261e;
+    --bad-weak: #fbeaea;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-md: 0 2px 8px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+    --radius: 14px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #12141c; --panel: #1a1d29; --panel-alt: #20232f; --border: #2b2f40;
+    --text: #eef0f6; --muted: #9aa2ba; --accent: #7c8bff; --accent-hover: #97a3ff;
+    --accent-weak: #262a45; --good: #4ad17f; --good-weak: #16311f;
+    --warn: #e0ac3f; --warn-weak: #3a2c10; --bad: #ff6b62; --bad-weak: #3b1a17;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.3); --shadow-md: 0 4px 16px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 16px 28px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+    box-shadow: var(--shadow-sm);
+    position: sticky; top: 0; z-index: 10; flex-wrap: wrap;
+  }
+  header .brand { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; }
+  header .brand .mark {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), #6a7dff);
+    box-shadow: var(--shadow-sm);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  header .sub {
+    color: var(--muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .04em; margin-left: 2px; display: block;
+  }
+  select, input[type=text], input[type=password], textarea {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 8px 11px; font: inherit;
+  }
+  select:focus, input:focus, textarea:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-weak);
+  }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 9px;
+    padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer;
+    box-shadow: var(--shadow-sm); transition: background .15s ease, transform .1s ease;
+  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.secondary {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    font-weight: 600; box-shadow: none;
+  }
+  button.secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-weak); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  main {
+    display: grid; grid-template-columns: 340px 1fr 270px; gap: 20px;
+    padding: 24px 28px; align-items: start; max-width: 1680px; margin: 0 auto;
+  }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow-md);
+  }
+  .panel h2 {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+    color: var(--muted); margin: 0 0 14px;
+  }
+  label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 12px 0 5px; }
+  label:first-child { margin-top: 0; }
+  textarea { width: 100%; resize: vertical; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; }
+  input[type=text], input[type=password] { width: 100%; }
+  select { width: 100%; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .checkbox-row { display: flex; align-items: center; gap: 7px; margin: 12px 0; }
+  .checkbox-row input { width: auto; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 12.5px; font-weight: 600; margin-top: 10px; }
+  .stack { display: flex; flex-direction: column; gap: 20px; }
+  .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat {
+    border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+    background: var(--panel-alt);
+  }
+  .stat .label { color: var(--muted); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .stat .value { font-size: 22px; font-weight: 700; margin-top: 3px; letter-spacing: -.01em; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px;
+    font-weight: 700; letter-spacing: .02em;
+  }
+  .badge.good { background: var(--good-weak); color: var(--good); }
+  .badge.bad { background: var(--bad-weak); color: var(--bad); }
+  .badge.warn { background: var(--warn-weak); color: var(--warn); }
+  .badge.muted { background: var(--accent-weak); color: var(--muted); }
+  .gauge-track {
+    height: 7px; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 9px;
+  }
+  .gauge-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
+  .stepper { display: flex; flex-wrap: wrap; gap: 8px; }
+  .step {
+    display: flex; align-items: center; gap: 7px; border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 500;
+    background: var(--panel-alt);
+  }
+  .step .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .step.done { border-color: color-mix(in srgb, var(--good) 35%, var(--border)); }
+  .step.done .dot { background: var(--good); }
+  .step.flagged { border-color: color-mix(in srgb, var(--warn) 35%, var(--border)); }
+  .step.flagged .dot { background: var(--warn); }
+  .step.skipped { opacity: .5; }
+  .step.pending .dot { background: var(--border); }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab {
+    padding: 9px 16px; font-size: 13px; font-weight: 600; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-color: var(--accent); }
+  .tabpage { display: none; }
+  .tabpage.active { display: block; }
+  ul.clean { margin: 0; padding-left: 20px; }
+  ul.clean li { margin: 5px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  tbody tr:hover { background: var(--panel-alt); }
+  pre {
+    white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 12.5px;
+    background: var(--panel-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    max-height: 320px; overflow: auto; line-height: 1.55;
+  }
+  .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+  .history-item {
+    display: block; width: 100%; text-align: left; background: var(--panel-alt);
+    border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px;
+    margin-bottom: 7px; color: var(--text); font-family: var(--mono); font-size: 11px;
+    cursor: pointer; transition: border-color .15s ease;
+  }
+  .history-item:hover { border-color: var(--accent); }
+  .error-banner {
+    background: var(--bad-weak); color: var(--bad);
+    border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); border-radius: 9px;
+    padding: 11px 14px; margin-bottom: 16px; font-size: 13px; font-weight: 500;
+  }
+  .info-banner {
+    background: var(--accent-weak); color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 9px;
+    padding: 11px 14px; margin-bottom: 14px; font-size: 12.5px; font-weight: 500;
+  }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff; display: inline-block; animation: spin .7s linear infinite; margin-right: 6px;
+    vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .metric-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px dashed var(--border); }
+  footer {
+    text-align: center; color: var(--muted); font-size: 11.5px; padding: 24px;
+    border-top: 1px solid var(--border); margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>AI Engine</h1>
+      <span class="sub">Compliance &amp; AML Dashboard</span>
+    </div>
+  </div>
+  <select id="pipelineSelect">
+    <option value="analyze">Full analysis</option>
+    <option value="analyze/investigation">Investigation only</option>
+    <option value="analyze/contract-review">Contract review</option>
+    <option value="analyze/privacy-review">Privacy review</option>
+  </select>
+  <button id="runBtn" type="button">Run analysis</button>
+  <button id="themeBtn" class="secondary" type="button" title="Toggle theme">🌓</button>
+</header>
+
+<main>
+  <!-- Input panel -->
+  <section class="panel stack">
+    <div>
+      <h2>Input</h2>
+      <label for="contractText">Contract text</label>
+      <textarea id="contractText" rows="9" placeholder="Paste contract text here…"></textarea>
+      <label for="sowText">SOW text (optional)</label>
+      <textarea id="sowText" rows="4" placeholder="Paste statement-of-work text…"></textarea>
+      <label for="clientSelect">Client (KYC records)</label>
+      <select id="clientSelect">
+        <option value="">— none —</option>
+      </select>
+      <div class="checkbox-row">
+        <input type="checkbox" id="containsPii" />
+        <label style="margin:0" for="containsPii">Metadata: contains_pii</label>
+      </div>
+      <details>
+        <summary>Advanced: extra metadata (JSON)</summary>
+        <textarea id="metadataJson" rows="3" placeholder='{"client_id": "123"}'></textarea>
+      </details>
+      <details>
+        <summary>API key (only if server requires one)</summary>
+        <input type="password" id="apiKey" placeholder="X-API-Key" />
+      </details>
+    </div>
+  </section>
+
+  <!-- Results panel -->
+  <section class="stack">
+    <div class="panel" id="resultsPanel">
+      <h2>Results</h2>
+      <div id="errorBanner"></div>
+      <div id="emptyState" class="empty">Run an analysis to see results here.</div>
+
+      <div id="resultsBody" style="display:none">
+        <div class="status-grid">
+          <div class="stat">
+            <div class="label">Risk score</div>
+            <div class="value" id="riskScoreVal">–</div>
+            <div class="gauge-track"><div class="gauge-fill" id="riskGauge"></div></div>
+          </div>
+          <div class="stat">
+            <div class="label">Confidence</div>
+            <div class="value" id="confidenceVal">–</div>
+          </div>
+          <div class="stat">
+            <div class="label">Verified</div>
+            <div class="value" id="verifiedVal">–</div>
+          </div>
+          <div class="stat">
+            <div class="label">Request ID</div>
+            <div class="value" id="requestIdVal" style="font-size:11px; font-family: var(--mono);">–</div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:18px">Pipeline</h2>
+        <div class="stepper" id="stepper"></div>
+
+        <div class="tabs" style="margin-top:16px">
+          <div class="tab active" data-tab="overview">Overview</div>
+          <div class="tab" data-tab="findings">Findings</div>
+          <div class="tab" data-tab="evidence">Evidence &amp; Citations</div>
+          <div class="tab" data-tab="sar">SAR Report</div>
+        </div>
+
+        <div class="tabpage active" data-page="overview">
+          <label>Investigation summary</label>
+          <pre id="investigationSummary">–</pre>
+          <label>Final verdict</label>
+          <pre id="finalVerdict">–</pre>
+          <label>Red flags</label>
+          <ul class="clean" id="redFlags"></ul>
+        </div>
+
+        <div class="tabpage" data-page="findings">
+          <label>Compliance findings</label>
+          <ul class="clean" id="complianceFindings"></ul>
+          <label>Privacy findings</label>
+          <ul class="clean" id="privacyFindings"></ul>
+          <label>Risk analysis</label>
+          <pre id="riskAnalysis">–</pre>
+          <label>Contradictions</label>
+          <ul class="clean" id="contradictions"></ul>
+          <label>Remediation plan</label>
+          <ul class="clean" id="remediationPlan"></ul>
+        </div>
+
+        <div class="tabpage" data-page="evidence">
+          <label>Evidence</label>
+          <table id="evidenceTable"><thead><tr><th>Source</th><th>Detail</th></tr></thead><tbody></tbody></table>
+          <label style="margin-top:12px">Citations</label>
+          <ul class="clean" id="citations"></ul>
+        </div>
+
+        <div class="tabpage" data-page="sar">
+          <div id="sarMissingNotice" style="display:none" class="info-banner">
+            This run didn't generate a SAR — only "Full analysis" includes the SAR stage.
+            Switch the pipeline dropdown to Full analysis and re-run to get a report.
+          </div>
+          <div id="sarContent">
+            <div class="row" style="justify-content: space-between; margin-bottom: 8px">
+              <span>
+                Verified:
+                <span class="badge" id="sarVerifiedBadge">–</span>
+              </span>
+              <button class="secondary" id="downloadSarBtn" type="button">Download SAR</button>
+            </div>
+            <label>Generated at</label>
+            <div id="sarGeneratedAt" style="font-family: var(--mono); font-size:12px">–</div>
+            <label>LLM summary</label>
+            <pre id="sarLlmSummary">–</pre>
+            <label>Recommendations</label>
+            <ul class="clean" id="sarRecommendations"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Side panel: history + metrics -->
+  <section class="panel stack">
+    <div>
+      <h2>History</h2>
+      <button class="secondary" id="refreshHistoryBtn" type="button" style="width:100%; margin-bottom:8px">Refresh</button>
+      <div id="historyList"><div class="empty">No executions yet.</div></div>
+    </div>
+    <div>
+      <h2>Metrics</h2>
+      <div id="metricsBody"><div class="empty">No metrics yet.</div></div>
+    </div>
+  </section>
+</main>
+
+<footer>AI Engine — served from FastAPI, no external calls except to its own /api/v1 endpoints.</footer>
+
+<script>
+(function () {
+  const PIPELINE_STEPS = [
+    "guardrail", "investigation", "evidence", "compliance", "privacy",
+    "risk", "reasoning", "contradiction", "remediation", "explainability",
+    "sar", "citation", "orchestrator",
+  ];
+
+  const $ = (sel) => document.querySelector(sel);
+  let lastResult = null;
+
+  // --- theme toggle ---
+  $("#themeBtn").addEventListener("click", () => {
+    const root = document.documentElement;
+    const current = root.getAttribute("data-theme") || "light";
+    root.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+  });
+
+  // --- tabs ---
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".tabpage").forEach((p) => p.classList.remove("active"));
+      tab.classList.add("active");
+      $(`.tabpage[data-page="${tab.dataset.tab}"]`).classList.add("active");
+    });
+  });
+
+  function apiHeaders() {
+    const headers = { "Content-Type": "application/json" };
+    const key = $("#apiKey").value.trim();
+    if (key) headers["X-API-Key"] = key;
+    return headers;
+  }
+
+  function showError(message) {
+    $("#errorBanner").innerHTML = message
+      ? `<div class="error-banner">${escapeHtml(message)}</div>`
+      : "";
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  function fillList(id, items) {
+    const el = $(id);
+    el.innerHTML = "";
+    if (!items || !items.length) {
+      el.innerHTML = '<li class="empty" style="list-style:none; margin-left:-18px">None</li>';
+      return;
+    }
+    items.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = typeof item === "string" ? item : JSON.stringify(item);
+      el.appendChild(li);
+    });
+  }
+
+  function renderStepper(executionLog, metadata) {
+    const stepper = $("#stepper");
+    stepper.innerHTML = "";
+    const byAgent = {};
+    (executionLog || []).forEach((entry) => {
+      byAgent[(entry.agent || "").toLowerCase()] = entry;
+    });
+    const privacySkipped = !byAgent["privacy"] && byAgent["risk"];
+
+    PIPELINE_STEPS.forEach((name) => {
+      const entry = byAgent[name];
+      const div = document.createElement("div");
+      let cls = "pending";
+      let label = name;
+      if (entry) {
+        cls = entry.flagged ? "flagged" : "done";
+      } else if (name === "privacy" && privacySkipped) {
+        cls = "skipped";
+        label = "privacy (skipped)";
+      }
+      div.className = `step ${cls}`;
+      div.innerHTML = `<span class="dot"></span>${escapeHtml(label)}`;
+      stepper.appendChild(div);
+    });
+  }
+
+  function renderResults(result) {
+    lastResult = result;
+    $("#emptyState").style.display = "none";
+    $("#resultsBody").style.display = "block";
+
+    const riskScore = result.risk_score ?? 0;
+    $("#riskScoreVal").textContent = riskScore;
+    const gauge = $("#riskGauge");
+    gauge.style.width = `${Math.max(0, Math.min(100, riskScore))}%`;
+    gauge.style.background = riskScore >= 70 ? "var(--bad)" : riskScore >= 35 ? "var(--warn)" : "var(--good)";
+
+    $("#confidenceVal").textContent = result.confidence != null ? result.confidence.toFixed(2) : "–";
+    $("#verifiedVal").innerHTML = result.verified
+      ? '<span class="badge good">YES</span>'
+      : '<span class="badge bad">NO</span>';
+    $("#requestIdVal").textContent = result.request_id || "–";
+
+    renderStepper(result.execution_log, result.metadata);
+
+    $("#investigationSummary").textContent = result.investigation_summary || "–";
+    $("#finalVerdict").textContent = result.final_verdict || "–";
+    fillList("#redFlags", result.red_flags);
+
+    fillList("#complianceFindings", result.compliance_findings);
+    fillList("#privacyFindings", result.privacy_findings);
+    $("#riskAnalysis").textContent = result.risk_analysis || "–";
+    fillList("#contradictions", result.contradictions);
+    fillList("#remediationPlan", result.remediation_plan);
+
+    const evidenceBody = $("#evidenceTable tbody");
+    evidenceBody.innerHTML = "";
+    (result.evidence || []).forEach((row) => {
+      const tr = document.createElement("tr");
+      const source = row.source || row.type || "evidence";
+      const detail = JSON.stringify(row);
+      tr.innerHTML = `<td>${escapeHtml(source)}</td><td><pre style="margin:0;max-height:120px">${escapeHtml(detail)}</pre></td>`;
+      evidenceBody.appendChild(tr);
+    });
+    if (!(result.evidence || []).length) {
+      evidenceBody.innerHTML = '<tr><td colspan="2" class="empty">No evidence records.</td></tr>';
+    }
+    fillList("#citations", result.citations);
+
+    const sar = result.sar || {};
+    const hasSar = Object.keys(sar).length > 0;
+    $("#sarMissingNotice").style.display = hasSar ? "none" : "block";
+    $("#sarContent").style.display = hasSar ? "block" : "none";
+
+    if (hasSar) {
+      const verification = sar.verification || {};
+      $("#sarVerifiedBadge").outerHTML = verification.verified
+        ? '<span class="badge good" id="sarVerifiedBadge">VERIFIED</span>'
+        : '<span class="badge warn" id="sarVerifiedBadge">UNVERIFIED</span>';
+      $("#sarGeneratedAt").textContent = sar.generated_at || "–";
+      $("#sarLlmSummary").textContent = sar.llm_summary || "–";
+      fillList("#sarRecommendations", sar.recommendations || result.recommendations);
+    }
+  }
+
+  async function runAnalysis() {
+    showError("");
+    const btn = $("#runBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Running…';
+
+    let metadata = {};
+    const metaRaw = $("#metadataJson").value.trim();
+    if (metaRaw) {
+      try {
+        metadata = JSON.parse(metaRaw);
+      } catch (e) {
+        showError("Metadata JSON is invalid: " + e.message);
+        btn.disabled = false;
+        btn.textContent = "Run analysis";
+        return;
+      }
+    }
+    if ($("#containsPii").checked) metadata.contains_pii = true;
+
+    const clientId = $("#clientSelect").value;
+    if (clientId) metadata.client_id = clientId;
+
+    const payload = {
+      contract_text: $("#contractText").value,
+      sow_text: $("#sowText").value,
+      metadata,
+    };
+
+    const endpoint = "/api/v1/" + $("#pipelineSelect").value;
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || `Request failed (${res.status})`);
+      }
+      renderResults(data);
+      loadHistory();
+      loadMetrics();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Run analysis";
+    }
+  }
+
+  function downloadSar() {
+    if (!lastResult) return;
+    const sar = lastResult.sar || {};
+    const lines = [
+      "SUSPICIOUS ACTIVITY REPORT",
+      "===========================",
+      `Generated at: ${sar.generated_at || ""}`,
+      `Request ID:   ${lastResult.request_id || ""}`,
+      `Risk score:   ${sar.risk_score ?? lastResult.risk_score ?? ""}`,
+      `Confidence:   ${sar.confidence ?? lastResult.confidence ?? ""}`,
+      `Verified:     ${(sar.verification || {}).verified ?? lastResult.verified ?? ""}`,
+      "",
+      "Summary",
+      "-------",
+      sar.summary || lastResult.investigation_summary || "",
+      "",
+      "LLM Summary",
+      "-----------",
+      sar.llm_summary || "",
+      "",
+      "Compliance findings",
+      "--------------------",
+      ...(sar.compliance_findings || lastResult.compliance_findings || []).map((f) => `- ${f}`),
+      "",
+      "Privacy findings",
+      "-----------------",
+      ...(sar.privacy_findings || lastResult.privacy_findings || []).map((f) => `- ${f}`),
+      "",
+      "Recommendations",
+      "----------------",
+      ...(sar.recommendations || lastResult.recommendations || []).map((f) => `- ${f}`),
+      "",
+      "Citations",
+      "---------",
+      ...(sar.citations || lastResult.citations || []).map((f) => `- ${f}`),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sar-report-${lastResult.request_id || "latest"}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadClients() {
+    const select = $("#clientSelect");
+    try {
+      const res = await fetch("/api/v1/clients", { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      (data.clients || []).forEach((client) => {
+        const option = document.createElement("option");
+        option.value = client.client_id;
+        const extra = [client.country, client.sector].filter(Boolean).join(", ");
+        option.textContent = `${client.client_id} — ${client.client_name}${extra ? ` (${extra})` : ""}`;
+        select.appendChild(option);
+      });
+    } catch (e) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.disabled = true;
+      option.textContent = `Could not load clients (${e.message}) — is this page served from the API server?`;
+      select.appendChild(option);
+    }
+  }
+
+  async function loadHistory() {
+    const list = $("#historyList");
+    try {
+      const res = await fetch("/api/v1/history", { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      list.innerHTML = "";
+      const ids = (data.request_ids || []).slice().reverse();
+      if (!ids.length) {
+        list.innerHTML = '<div class="empty">No executions yet.</div>';
+        return;
+      }
+      ids.forEach((id) => {
+        const btn = document.createElement("button");
+        btn.className = "history-item";
+        btn.textContent = id;
+        btn.addEventListener("click", () => loadHistoryItem(id));
+        list.appendChild(btn);
+      });
+    } catch (e) {
+      list.innerHTML = `<div class="empty">Could not load history (${escapeHtml(e.message)}).</div>`;
+    }
+  }
+
+  async function loadHistoryItem(id) {
+    showError("");
+    try {
+      const res = await fetch(`/api/v1/history/${id}`, { headers: apiHeaders() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to load history item");
+      renderResults(data);
+    } catch (e) {
+      showError(e.message);
+    }
+  }
+
+  async function loadMetrics() {
+    const body = $("#metricsBody");
+    try {
+      const res = await fetch("/api/v1/metrics", { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      body.innerHTML = "";
+      const counters = data.counters || {};
+      const timings = data.timings || {};
+      const counterKeys = Object.keys(counters);
+      const timingKeys = Object.keys(timings);
+      if (!counterKeys.length && !timingKeys.length) {
+        body.innerHTML = '<div class="empty">No metrics yet.</div>';
+        return;
+      }
+      counterKeys.forEach((k) => {
+        body.innerHTML += `<div class="metric-row"><span>${escapeHtml(k)}</span><span>${counters[k]}</span></div>`;
+      });
+      timingKeys.forEach((k) => {
+        const t = timings[k];
+        body.innerHTML += `<div class="metric-row"><span>${escapeHtml(k)} avg</span><span>${t.avg.toFixed(3)}s (${t.count})</span></div>`;
+      });
+    } catch (e) {
+      body.innerHTML = `<div class="empty">Could not load metrics (${escapeHtml(e.message)}).</div>`;
+    }
+  }
+
+  $("#runBtn").addEventListener("click", runAnalysis);
+  $("#refreshHistoryBtn").addEventListener("click", () => { loadHistory(); loadMetrics(); });
+  $("#downloadSarBtn").addEventListener("click", downloadSar);
+
+  loadClients();
+  loadHistory();
+  loadMetrics();
+})();
+</script>
+</body>
+</html>

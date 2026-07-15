@@ -111,8 +111,17 @@ class VectorStore:
         if not vectors_path.exists() or not meta_path.exists():
             return None
 
+        vectors = np.load(vectors_path)
+
+        if vectors.shape[1] != dim:
+            # Embedding provider/model changed since this store was
+            # persisted (e.g. switching to/from NVIDIA NIM) — its
+            # vectors live in a different space, so rebuild from source
+            # instead of returning a store that can't be searched.
+            return None
+
         store = cls(name, dim)
-        store.vectors = np.load(vectors_path)
+        store.vectors = vectors
 
         with open(meta_path, "r", encoding="utf-8") as f:
             store.metadatas = json.load(f)

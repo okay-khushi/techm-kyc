@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.middleware import RequestLoggingMiddleware
 from app.api.routes import router
@@ -15,6 +16,15 @@ app = FastAPI(
 app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(router)
+
+# Self-contained dashboard: submits contracts/SOWs to /api/v1/analyze*
+# and renders the resulting pipeline state + SAR report. No build step,
+# no extra dependencies — served straight from app/static/dashboard.
+app.mount(
+    "/dashboard",
+    StaticFiles(directory="app/static/dashboard", html=True),
+    name="dashboard",
+)
 
 
 @app.exception_handler(RequestValidationError)
