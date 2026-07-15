@@ -1,0 +1,14 @@
+{
+  "name": "continuous-kyc-autonomous-auditor-frontend",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Frontend dashboard for the Continuous KYC Autonomous Auditor (SHARED FILE - coordinate before modifying).",
+  "scripts": {
+    "dev": "echo \"TODO: wire up dev server (e.g., vite)\"",
+    "build": "echo \"TODO: wire up build\"",
+    "test": "echo \"TODO: wire up test runner\"",
+    "lint": "echo \"TODO: wire up linter\""
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

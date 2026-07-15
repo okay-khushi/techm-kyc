@@ -1,0 +1,92 @@
+# Secrets / environment
+.env
+.env.*
+!.env.example
+kaggle.json
+credentials.json
+secrets.json
+*.pem
+*.key
+
+# TLS local development certificates/keys (Phase 7) — self-signed, generated
+# locally by scripts/setup/generate-dev-tls-cert.ps1. Never commit private
+# key material or generated certs, even for local-only demonstration use.
+certs/
+*.crt
+*.pfx
+*.p12
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Data (raw & processed) — keep directory structure via .gitkeep and
+# explicitly whitelisted samples, but never commit dataset files.
+# Note: re-include the directories (!.../**/) so nested .gitkeep files are
+# reachable — a file cannot be un-ignored if its parent dir stays excluded.
+data/raw/**
+data/processed/**
+!data/raw/**/
+!data/raw/**/.gitkeep
+!data/processed/**/
+!data/processed/.gitkeep
+!data/samples/**
+
+# Encrypted application artifacts (Phase 6) — local-only, never committed even
+# though they're encrypted (defense in depth; the envelope + key_id are not
+# secret, but the directory is still kept out of git).
+data/encrypted/**
+!data/encrypted/**/
+!data/encrypted/**/.gitkeep
+
+# Security audit log (Phase 9) — local structured / hash-chained JSONL audit
+# trail (backend/var/audit/). Runtime-generated only, never committed, even
+# though entries are centrally sanitized before being written (defense in
+# depth, same rationale as data/encrypted/ above).
+backend/var/audit/**
+!backend/var/audit/**/
+!backend/var/audit/.gitkeep
+
+# Tabular / binary data and model artifact formats
+*.csv
+*.xls
+*.xlsx
+*.xlsm
+*.parquet
+*.pkl
+*.joblib
+*.pt
+*.pth
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ML artifacts
+ml/artifacts/*
+!ml/artifacts/.gitkeep
+
+# Alembic-generated local db
+*.sqlite3
+*.db
